@@ -18,7 +18,7 @@ import {
   printWelcomeMessage,
   printBoxMessage,
   fileUtils,
-  getNextPort
+  getNextPort,
 } from '../utils'
 import flagsDefinition from '../utils/flags'
 import openBrowser from '../utils/open'
@@ -138,7 +138,9 @@ Run ${chalk.italic.green('npm i -g @cloudgraph/cli')} to install`)
       const serverPort = port ?? configPort
       const availablePort = await getNextPort(Number(serverPort))
       if (serverPort !== availablePort) {
-        this.logger.warn(`Requested port ${serverPort} is unavailable, using ${availablePort}`)
+        this.logger.warn(
+          `Requested port ${serverPort} is unavailable, using ${availablePort}`
+        )
       }
       const queryEngine = new QueryEngine(availablePort)
       await queryEngine.startServer(this.getHost(this.getConnectionSettings()))
@@ -249,9 +251,9 @@ Run ${chalk.italic.green('npm i -g @cloudgraph/cli')} to install`)
 
   async getPolicyPackClient({
     policyPack,
-  }: // mappings,
-  // provider,
-  {
+    mappings,
+    provider,
+  }: {
     policyPack: string
     provider: string
     mappings: { [schemaName: string]: string }
