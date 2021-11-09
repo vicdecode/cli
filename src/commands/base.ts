@@ -23,7 +23,7 @@ import {
 import flagsDefinition from '../utils/flags'
 import openBrowser from '../utils/open'
 import { PluginType } from '../utils/constants'
-import { CloudGraphConfig } from '../types'
+import { CloudGraphConfig, SchemaMap } from '../types'
 
 export default abstract class BaseCommand extends Command {
   constructor(argv: any, config: any) {
@@ -218,13 +218,16 @@ Run ${chalk.italic.green('npm i -g @cloudgraph/cli')} to install`)
     return this.manager
   }
 
-  async getProviderClient(provider: string): Promise<any> {
+  async getProviderClient(
+    provider: string
+  ): Promise<{ client: any; schemasMap?: SchemaMap }> {
     try {
       const manager = this.getPluginManager(PluginType.Provider)
       if (this.providers[provider]) {
         return this.providers[provider]
       }
-      const { default: Client } = (await manager.getPlugin(provider)) ?? {}
+      const { default: Client, schemasMap } =
+        (await manager.getPlugin(provider)) ?? {}
       if (!Client || !(Client instanceof Function)) {
         // TODO: how can we better type this for the base Provider class from sdk
         throw new Error(
@@ -236,7 +239,7 @@ Run ${chalk.italic.green('npm i -g @cloudgraph/cli')} to install`)
         provider: this.getCGConfig(provider),
       })
       this.providers[provider] = client
-      return client
+      return { client, schemasMap }
     } catch (error: any) {
       this.logger.error(error)
       this.logger.warn(
@@ -245,7 +248,7 @@ Run ${chalk.italic.green('npm i -g @cloudgraph/cli')} to install`)
       this.logger.info(
         'For more information on this error, please see https://github.com/cloudgraphdev/cli#common-errors'
       )
-      return null
+      return { client: null }
     }
   }
 
