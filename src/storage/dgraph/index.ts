@@ -114,11 +114,12 @@ export default class DgraphEngine
    * Add Service Mutation to axiosPromises Array
    */
   push(data: GraphQLInputData): void {
-    const { query, connectedData } = data
+    const { query, input, patch } = data
     const queryData = {
       query,
       variables: {
-        input: connectedData,
+        input,
+        patch
       },
     }
     this.axiosPromises.push(() =>

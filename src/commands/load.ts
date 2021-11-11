@@ -4,7 +4,11 @@ import path from 'path'
 import { isEmpty } from 'lodash'
 
 import Command from './base'
-import { fileUtils, processConnectionsBetweenEntities } from '../utils'
+import {
+  fileUtils,
+  insertEntitiesAndConnections,
+  processConnectionsAfterInitialInsertion,
+} from '../utils'
 
 export default class Load extends Command {
   static description = 'Load a specific version of your CloudGraph data'
@@ -79,7 +83,7 @@ export default class Load extends Command {
       this.logger.info(
         `Beginning ${chalk.italic.green('LOAD')} for ${provider}`
       )
-      const { client } = await this.getProviderClient(provider)
+      const { client, schemasMap } = await this.getProviderClient(provider)
       if (!client) {
         continue // eslint-disable-line no-continue
       }
@@ -143,7 +147,7 @@ export default class Load extends Command {
           version = versionString.split('-')[1] // eslint-disable-line prefer-destructuring
           file = fileUtils.findProviderFileLocation(
             path.join(dataDir, this.versionDirectory),
-            fileName,
+            fileName
           )
           const foundFile = files.find(val => val.name === file)
           if (!foundFile) {
@@ -193,9 +197,28 @@ export default class Load extends Command {
        * Push connected entity into dgraph
        */
       this.logger.startSpinner(
+        `Inserting entities for ${chalk.italic.green(provider)}`
+      )
+      insertEntitiesAndConnections(
+        provider,
+        providerData,
+        storageEngine,
+        storageRunning,
+        schemasMap
+      )
+      this.logger.successSpinner(
+        `Entities inserted successfully for ${chalk.italic.green(provider)}`
+      )
+      this.logger.startSpinner(
         `Making service connections for ${chalk.italic.green(provider)}`
       )
-      processConnectionsBetweenEntities(providerData, storageEngine, storageRunning)
+      processConnectionsAfterInitialInsertion(
+        provider,
+        providerData,
+        storageEngine,
+        storageRunning,
+        schemasMap
+      )
       this.logger.successSpinner(
         `Connections made successfully for ${chalk.italic.green(provider)}`
       )
