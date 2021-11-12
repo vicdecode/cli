@@ -5,11 +5,7 @@ import { Opts } from '@cloudgraph/sdk'
 import { range } from 'lodash'
 
 import Command from './base'
-import {
-  fileUtils,
-  insertEntitiesAndConnections,
-  processConnectionsAfterInitialInsertion,
-} from '../utils'
+import { fileUtils, loadAllData } from '../utils'
 import DgraphEngine from '../storage/dgraph'
 import scanReport from '../scanReport'
 
@@ -112,7 +108,9 @@ export default class Scan extends Command {
       this.logger.info(
         `Beginning ${chalk.italic.green('SCAN')} for ${provider}`
       )
-      const { client, schemasMap } = await this.getProviderClient(provider)
+      const { client, schemasMap: schemaMap } = await this.getProviderClient(
+        provider
+      )
       if (!client) {
         failedProviderList.push(provider)
         this.logger.warn(`No valid client found for ${provider}, skipping...`)
@@ -195,32 +193,15 @@ export default class Scan extends Command {
         this.exit()
       }
 
-      this.logger.startSpinner(
-        `Inserting entities for ${chalk.italic.green(provider)}`
-      )
-      insertEntitiesAndConnections(
-        provider,
-        providerData,
-        storageEngine,
-        storageRunning,
-        schemasMap
-      )
-      this.logger.successSpinner(
-        `Entities inserted successfully for ${chalk.italic.green(provider)}`
-      )
-
-      this.logger.startSpinner(
-        `Making service connections for ${chalk.italic.green(provider)}`
-      )
-      processConnectionsAfterInitialInsertion(
-        provider,
-        providerData,
-        storageEngine,
-        storageRunning,
-        schemasMap
-      )
-      this.logger.successSpinner(
-        `Connections made successfully for ${chalk.italic.green(provider)}`
+      loadAllData(
+        {
+          provider,
+          providerData,
+          storageEngine,
+          storageRunning,
+          schemaMap,
+        },
+        this.logger
       )
     }
 

@@ -1,6 +1,11 @@
 import { ExecutionResult } from 'graphql'
 
-import { GraphQLInputData, StorageEngine, StorageEngineConfig } from '../types'
+import {
+  GraphQLInputData,
+  GraphQLQueryData,
+  StorageEngine,
+  StorageEngineConfig,
+} from '../types'
 import DGraphClientWrapper from './base'
 import { processGQLExecutionResult, UPDATE_SCHEMA_QUERY } from './utils'
 
@@ -115,11 +120,11 @@ export default class DgraphEngine
    */
   push(data: GraphQLInputData): void {
     const { query, input, patch } = data
-    const queryData = {
+    const queryData: GraphQLQueryData = {
       query,
       variables: {
         input,
-        patch
+        patch,
       },
     }
     this.axiosPromises.push(() =>
@@ -133,7 +138,7 @@ export default class DgraphEngine
             reqData: queryData,
             resData,
             errors,
-            service: data.name
+            service: data.name,
           })
         })
         .catch(error => Promise.reject(error))

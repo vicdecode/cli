@@ -21,6 +21,15 @@ export interface GraphQLInputData {
   name: string
 }
 
+export interface GraphQLQueryData {
+  query: string
+  input?: any
+  variables: {
+    input?: any
+    patch?: any
+  }
+}
+
 export interface StorageEngineConnectionConfig {
   scheme: string
   host: string

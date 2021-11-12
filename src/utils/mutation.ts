@@ -13,7 +13,7 @@ export function generateMutation(
   const capitalizedType = capitalizeString(type)
   // cases: add(upsert), update(update)
   // input names are different for upsert and update
-  const mutationVarName = type === 'add' ? 'input' : 'patch'
+  const mutationVarName = type === 'add' ? '$input' : '$patch'
   const providerServiceString = service.includes(provider)
     ? service
     : `${provider}${service}`
@@ -32,8 +32,8 @@ export function generateMutation(
   const internalQuery =
     type === 'add' ? 'numUids' : `${providerServiceString}{id}`
   // And we put everything together
-  const mutation = `mutation($${mutationVarName}: ${mutationInputType}) {
-    ${type}${providerServiceString}(input: $${mutationVarName}${mutationAdditionalArgs}) {
+  const mutation = `mutation(${mutationVarName}: ${mutationInputType}) {
+    ${type}${providerServiceString}(input: ${mutationVarName}${mutationAdditionalArgs}) {
       ${internalQuery}
     }
   }`
@@ -56,6 +56,4 @@ export const getResourceNameForMutationGenerator = (
   entity: Entity,
   schemaMap: SchemaMap | undefined
 ): string =>
-  (entity.mutation ||
-    (schemaMap && schemaMap[entity.name]) ||
-    entity.className) as string
+  ((schemaMap && schemaMap[entity.name]) || entity.className) as string

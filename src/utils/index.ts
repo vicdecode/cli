@@ -1,5 +1,8 @@
-// import CloudGraph, { Opts } from '@cloudgraph/sdk'
-import CloudGraph, { ProviderData } from '@cloudgraph/sdk'
+import CloudGraph, {
+  Logger,
+  ProviderData,
+  ServiceConnection,
+} from '@cloudgraph/sdk'
 import { loadFilesSync } from '@graphql-tools/load-files'
 import { mergeTypeDefs } from '@graphql-tools/merge'
 import { print } from 'graphql'
@@ -16,7 +19,7 @@ import detect from 'detect-port'
 import scanReport, { scanDataType, scanResult } from '../scanReport'
 import C, { DEFAULT_CONFIG, DGRAPH_CONTAINER_LABEL } from '../utils/constants'
 import { StorageEngine, StorageEngineConnectionConfig } from '../storage/types'
-import { SchemaMap } from '../types'
+import { DataToLoad, SchemaMap } from '../types'
 import {
   generateMutation,
   generateUpdateVarsObject,
@@ -114,7 +117,7 @@ export function getConnectedEntity(
     : allConnections[service.id]
   const connectedEntity: any = { ...(afterNodeInsertion ? {} : service) }
   let connectionsStatus = scanResult.pass
-  if (connections) {
+  if (!isEmpty(connections)) {
     for (const connection of connections) {
       const entityData = entities.find(
         ({ name }: { name: string }) => name === connection.resourceType
@@ -156,55 +159,16 @@ export function getConnectedEntity(
   return connectedEntity
 }
 
-export function processConnectionsAfterInitialInsertion(
-  provider: string,
-  providerData: ProviderData,
-  storageEngine: StorageEngine,
-  storageRunning: boolean,
-  schemaMap: SchemaMap | undefined
-): void {
+export function insertEntitiesAndConnections({
+  provider,
+  providerData,
+  storageEngine,
+  storageRunning,
+  schemaMap,
+}: DataToLoad): void {
   try {
     for (const entity of providerData.entities) {
-      const { data, name } = entity
-      const resourceName: string = getResourceNameForMutationGenerator(
-        entity,
-        schemaMap
-      )
-      data.map((service: any) => {
-        const connections = getConnectedEntity(
-          service,
-          providerData,
-          name,
-          true
-        )
-        if (!isEmpty(connections)) {
-          // REPORT STUFF
-          if (storageRunning) {
-            // Add service mutation to promises array
-            storageEngine.push({
-              query: generateMutation('update', provider, resourceName),
-              patch: generateUpdateVarsObject(service, connections),
-              name,
-            })
-          }
-        }
-      })
-    }
-  } catch (error) {
-    logger.debug(JSON.stringify(error))
-  }
-}
-
-export function insertEntitiesAndConnections(
-  provider: string,
-  providerData: ProviderData,
-  storageEngine: StorageEngine,
-  storageRunning: boolean,
-  schemaMap: SchemaMap | undefined
-): void {
-  try {
-    for (const entity of providerData.entities) {
-      const { data, name } = entity
+      const { data, mutation, name } = entity
       const resourceName: string = getResourceNameForMutationGenerator(
         entity,
         schemaMap
@@ -215,19 +179,95 @@ export function insertEntitiesAndConnections(
           type: scanDataType.count,
           result: scanResult.pass,
         })
-        return getConnectedEntity(service, providerData, name)
+        return getConnectedEntity(service, providerData, name, false)
       })
       if (storageRunning) {
-        storageEngine.push({
-          query: generateMutation('add', provider, resourceName),
-          input: connectedData,
-          name,
+        const query =
+          mutation || generateMutation('add', provider, resourceName)
+        storageEngine.push({ query, input: connectedData, name })
+      }
+    }
+  } catch (error) {
+    logger.debug(JSON.stringify(error))
+  }
+}
+
+export function processConnectionsAfterInitialInsertion({
+  provider,
+  providerData,
+  storageEngine,
+  storageRunning,
+  schemaMap,
+}: DataToLoad): void {
+  try {
+    if (!isEmpty(providerData.additionalConnections)) {
+      // Filter resourceTypes that have additional connections to process
+      const resourcesWithAdditionalConnections = new Set(
+        Object.values(
+          providerData.additionalConnections as {
+            [key: string]: ServiceConnection[]
+          }
+        )
+        .flat()
+        .map(({ resourceType }) => resourceType)
+      )
+      // Filter entities that match filtered resourceTypes
+      const entities = providerData.entities.filter(({ name }) =>
+        resourcesWithAdditionalConnections.has(name)
+      )
+      for (const entity of entities) {
+        const { data, name } = entity
+        const resourceName: string = getResourceNameForMutationGenerator(
+          entity,
+          schemaMap
+        )
+        data.map((service: any) => {
+          const connections = getConnectedEntity(
+            service,
+            providerData,
+            name,
+            true
+          )
+          if (!isEmpty(connections)) {
+            // REPORT STUFF?
+            if (storageRunning) {
+              const query = generateMutation('update', provider, resourceName)
+              const patch = generateUpdateVarsObject(service, connections)
+              // Add service mutation to promises array
+              storageEngine.push({ query, patch, name })
+            }
+          }
         })
       }
     }
   } catch (error) {
     logger.debug(JSON.stringify(error))
   }
+}
+
+export const loadAllData = (data: DataToLoad, loggerInstance: Logger): void => {
+  loggerInstance.startSpinner(
+    `Inserting entities and connections for ${chalk.italic.green(
+      data.provider
+    )}`
+  )
+  insertEntitiesAndConnections(data)
+  loggerInstance.successSpinner(
+    `Entities and connections inserted successfully for ${chalk.italic.green(
+      data.provider
+    )}`
+  )
+  loggerInstance.startSpinner(
+    `Processing additional service connections for ${chalk.italic.green(
+      data.provider
+    )}`
+  )
+  processConnectionsAfterInitialInsertion(data)
+  loggerInstance.successSpinner(
+    `Additional connections processed successfully for ${chalk.italic.green(
+      data.provider
+    )}`
+  )
 }
 
 export function printWelcomeMessage(): void {
